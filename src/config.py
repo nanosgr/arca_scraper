@@ -50,3 +50,13 @@ BROWSER_USER_AGENT = (
     "AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/124.0.0.0 Safari/537.36"
 )
+
+# Integración con Odoo: subida automática del CSV descargado al endpoint del
+# módulo l10n_ar_import_arca_excel (importa el Libro de Compras sin
+# intervención manual). Opcional: si no están las 3 variables, se omite el
+# paso de subida y el scraper se comporta como hasta ahora (solo descarga).
+# ODOO_UPLOAD_URL apunta al ambiente elegido (producción o staging), a
+# criterio de quien despliega este .env.
+ODOO_UPLOAD_URL = os.getenv('ODOO_UPLOAD_URL')  # ej: https://aerotec.odoo.com/l10n_ar_arca_import/upload
+ODOO_API_TOKEN = os.getenv('ODOO_API_TOKEN')
+ODOO_COMPANY_ID = os.getenv('ODOO_COMPANY_ID')

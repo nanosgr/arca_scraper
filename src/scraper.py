@@ -10,6 +10,7 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 from src import config
+from src import odoo_uploader
 from src.authenticator import ARCAAuthenticator
 from src.iva_api import IVAApiClient
 
@@ -105,6 +106,22 @@ def main():
             logger.info(f"Descarga completada: {archivo}")
             logger.info(f"Representado: {config.ARCA_REPRESENTADO_NOMBRE} ({config.ARCA_REPRESENTADO_CUIT})")
             logger.info("=" * 60)
+
+            # ── Subida automática a Odoo (opcional) ─────────────────────
+            # La descarga ya se completó (lo esencial de esta corrida); un
+            # fallo acá no debe hacer perder ese resultado, pero sí queda
+            # marcado con un código de salida distinto para poder
+            # monitorearlo aparte.
+            if odoo_uploader.is_configured():
+                try:
+                    odoo_uploader.upload_libro_compras(Path(archivo))
+                except Exception as e:
+                    logger.error("=" * 60)
+                    logger.error(f"La descarga fue exitosa pero falló la subida a Odoo: {str(e)}")
+                    logger.error("=" * 60)
+                    return 2
+            else:
+                logger.info("Integración con Odoo no configurada (ODOO_UPLOAD_URL/ODOO_API_TOKEN/ODOO_COMPANY_ID); se omite la subida.")
 
             return 0
 

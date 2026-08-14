@@ -116,6 +116,22 @@ ARCA_PASSWORD=tu_password_real
 
 **IMPORTANTE:** El archivo `.env` contiene información sensible. Nunca lo subas a Git (ya está incluido en `.gitignore`).
 
+### 1.1 Integración con Odoo (opcional)
+
+Si además de descargar el Libro de Compras querés que el propio script lo suba a Odoo para importarlo automáticamente (sin abrir el wizard a mano), completá también en `.env`:
+
+```env
+ODOO_UPLOAD_URL=https://tu-instancia.odoo.com/l10n_ar_arca_import/upload
+ODOO_API_TOKEN=el-token-configurado-en-odoo
+ODOO_COMPANY_ID=5
+```
+
+- `ODOO_UPLOAD_URL` debe apuntar al ambiente que corresponda (producción o staging) — la elección de ambiente es a criterio de quien despliega este `.env`.
+- `ODOO_API_TOKEN` tiene que coincidir con el parámetro de sistema `l10n_ar_import_arca_excel.api_token` configurado en Odoo (Ajustes > Técnico > Parámetros del Sistema).
+- `ODOO_COMPANY_ID` es el ID numérico de la compañía en Odoo (se ve en la URL al entrar a Ajustes > Compañías > [la compañía]).
+- Si dejás estas 3 variables vacías, el scraper se comporta exactamente igual que antes: solo descarga el archivo, sin subirlo a ningún lado.
+- El resultado de la importación (facturas nuevas, ya existentes, con error) lo manda Odoo por mail, si se configuró `l10n_ar_import_arca_excel.notification_email` del lado de Odoo. Un fallo en la subida en sí (red, token incorrecto) queda registrado en el log del scraper y hace que el script termine con código de salida `2` (la descarga en sí sigue contando como exitosa).
+
 ### 2. Ajustar configuración (opcional)
 
 Puedes modificar `src/config.py` para:
