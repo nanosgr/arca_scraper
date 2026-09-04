@@ -39,6 +39,52 @@ def setup_logging():
     return logging.getLogger(__name__)
 
 
+def procesar_empresa(authenticator, iva_client, empresa, logger):
+    """
+    Selecciona 'empresa' como representado activo, descarga su Libro de
+    Compras y, si Odoo está configurado, lo sube. No propaga excepciones:
+    main() debe seguir con la próxima empresa si algo falla acá. Devuelve
+    un dict con el resultado para el resumen final.
+    """
+    nombre = empresa['nombre']
+    cuit = empresa['cuit']
+    resultado = {'empresa': nombre, 'cuit': cuit, 'estado': 'error', 'detalle': None}
+
+    try:
+        logger.info(f"--- Procesando representado: {nombre} ({cuit}) ---")
+        iva_client.seleccionar_representado(cuit)
+        authenticator.sync_iva_post_relacion()
+        authenticator.ingresar_nueva_declaracion()
+        authenticator.ingresar_periodo()
+        authenticator.ingresar_registro_declaracion()
+        authenticator.navegar_libro_compras()
+        authenticator.importar_desde_arca()
+
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        cuit_limpio = cuit.replace("-", "")
+        csv_path = config.DATA_DIR / f"libro_compras_{cuit_limpio}_{timestamp}.csv"
+        archivo = authenticator.descargar_csv_libro_compras(csv_path)
+        logger.info(f"Descarga completada para {nombre}: {archivo}")
+        resultado['estado'] = 'descargado'
+
+        if odoo_uploader.is_configured():
+            try:
+                odoo_uploader.upload_libro_compras(Path(archivo), empresa['odoo_company_id'])
+                resultado['estado'] = 'ok'
+            except Exception as e:
+                logger.error(f"Descarga OK para {nombre}, pero falló la subida a Odoo: {e}")
+                resultado['estado'] = 'odoo_error'
+                resultado['detalle'] = str(e)
+        else:
+            resultado['estado'] = 'ok'
+
+    except Exception as e:
+        logger.error(f"Error procesando {nombre} ({cuit}): {e}")
+        resultado['detalle'] = str(e)
+
+    return resultado
+
+
 def main():
     """Función principal del scraper"""
     logger = setup_logging()
@@ -81,48 +127,33 @@ def main():
             iva_cookies = authenticator.get_iva_cookies()
             iva_client = IVAApiClient(iva_cookies)
 
-            logger.info(f"Seleccionando representado: {config.ARCA_REPRESENTADO_NOMBRE}")
-            iva_client.seleccionar_representado(config.ARCA_REPRESENTADO_CUIT)
+            empresas = config.EMPRESAS
+            logger.info(f"Empresas a procesar: {len(empresas)}")
+            if not odoo_uploader.is_configured():
+                logger.info("Integración con Odoo no configurada (ODOO_UPLOAD_URL/ODOO_API_TOKEN); se omite la subida para todas las empresas.")
 
-            # Sincronizar Playwright con el nuevo representado
-            iva_page = authenticator.sync_iva_post_relacion()
+            resultados = [
+                procesar_empresa(authenticator, iva_client, empresa, logger)
+                for empresa in empresas
+            ]
 
-            # ── PLAYWRIGHT: navegar al Libro Compras en liva.afip.gob.ar ──
-            iva_page = authenticator.ingresar_nueva_declaracion()
-            iva_page = authenticator.ingresar_periodo()
-            iva_page = authenticator.ingresar_registro_declaracion()
-            iva_page = authenticator.navegar_libro_compras()
-
-            # ── PLAYWRIGHT: importar desde ARCA antes de descargar ────
-            iva_page = authenticator.importar_desde_arca()
-
-            # ── PLAYWRIGHT: descargar CSV del Libro Compras ────────────
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            cuit_limpio = config.ARCA_REPRESENTADO_CUIT.replace("-", "")
-            csv_path = config.DATA_DIR / f"libro_compras_{cuit_limpio}_{timestamp}.csv"
-            archivo = authenticator.descargar_csv_libro_compras(csv_path)
+            # ── Resumen final ────────────────────────────────────────
+            ok = [r for r in resultados if r['estado'] == 'ok']
+            odoo_error = [r for r in resultados if r['estado'] in ('descargado', 'odoo_error')]
+            fallidas = [r for r in resultados if r['estado'] == 'error']
 
             logger.info("=" * 60)
-            logger.info(f"Descarga completada: {archivo}")
-            logger.info(f"Representado: {config.ARCA_REPRESENTADO_NOMBRE} ({config.ARCA_REPRESENTADO_CUIT})")
+            logger.info(f"Resumen: {len(ok)}/{len(resultados)} empresas OK")
+            for r in odoo_error:
+                logger.warning(f"  - {r['empresa']} ({r['cuit']}): descarga OK, falló Odoo")
+            for r in fallidas:
+                logger.error(f"  - {r['empresa']} ({r['cuit']}): FALLÓ - {r['detalle']}")
             logger.info("=" * 60)
 
-            # ── Subida automática a Odoo (opcional) ─────────────────────
-            # La descarga ya se completó (lo esencial de esta corrida); un
-            # fallo acá no debe hacer perder ese resultado, pero sí queda
-            # marcado con un código de salida distinto para poder
-            # monitorearlo aparte.
-            if odoo_uploader.is_configured():
-                try:
-                    odoo_uploader.upload_libro_compras(Path(archivo))
-                except Exception as e:
-                    logger.error("=" * 60)
-                    logger.error(f"La descarga fue exitosa pero falló la subida a Odoo: {str(e)}")
-                    logger.error("=" * 60)
-                    return 2
-            else:
-                logger.info("Integración con Odoo no configurada (ODOO_UPLOAD_URL/ODOO_API_TOKEN/ODOO_COMPANY_ID); se omite la subida.")
-
+            if fallidas:
+                return 1
+            if odoo_error:
+                return 2
             return 0
 
     except Exception as e:

@@ -17,12 +17,13 @@ logger = logging.getLogger(__name__)
 
 
 def is_configured() -> bool:
-    return bool(config.ODOO_UPLOAD_URL and config.ODOO_API_TOKEN and config.ODOO_COMPANY_ID)
+    return bool(config.ODOO_UPLOAD_URL and config.ODOO_API_TOKEN)
 
 
-def upload_libro_compras(csv_path: Path, timeout: int = 180) -> dict:
+def upload_libro_compras(csv_path: Path, company_id, timeout: int = 180) -> dict:
     """
-    Sube 'csv_path' al endpoint de importación de Odoo.
+    Sube 'csv_path' al endpoint de importación de Odoo, para la compañía
+    'company_id' (id numérico de la empresa en Odoo).
 
     Lanza excepción si la petición HTTP en sí falla (timeout, conexión,
     status >= 400). Un fallo de negocio dentro de Odoo (ej. archivo con
@@ -31,15 +32,15 @@ def upload_libro_compras(csv_path: Path, timeout: int = 180) -> dict:
     """
     if not is_configured():
         raise RuntimeError(
-            "Integración con Odoo no configurada: definí ODOO_UPLOAD_URL, "
-            "ODOO_API_TOKEN y ODOO_COMPANY_ID en el archivo .env"
+            "Integración con Odoo no configurada: definí ODOO_UPLOAD_URL y "
+            "ODOO_API_TOKEN en el archivo .env"
         )
 
-    logger.info(f"Subiendo '{csv_path.name}' a Odoo ({config.ODOO_UPLOAD_URL})...")
+    logger.info(f"Subiendo '{csv_path.name}' a Odoo ({config.ODOO_UPLOAD_URL}), company_id={company_id}...")
     with open(csv_path, 'rb') as f:
         response = requests.post(
             config.ODOO_UPLOAD_URL,
-            data={'token': config.ODOO_API_TOKEN, 'company_id': config.ODOO_COMPANY_ID},
+            data={'token': config.ODOO_API_TOKEN, 'company_id': company_id},
             files={'file': (csv_path.name, f, 'text/csv')},
             timeout=timeout,
         )

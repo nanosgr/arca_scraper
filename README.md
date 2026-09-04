@@ -123,14 +123,40 @@ Si además de descargar el Libro de Compras querés que el propio script lo suba
 ```env
 ODOO_UPLOAD_URL=https://tu-instancia.odoo.com/l10n_ar_arca_import/upload
 ODOO_API_TOKEN=el-token-configurado-en-odoo
-ODOO_COMPANY_ID=5
 ```
 
 - `ODOO_UPLOAD_URL` debe apuntar al ambiente que corresponda (producción o staging) — la elección de ambiente es a criterio de quien despliega este `.env`.
 - `ODOO_API_TOKEN` tiene que coincidir con el parámetro de sistema `l10n_ar_import_arca_excel.api_token` configurado en Odoo (Ajustes > Técnico > Parámetros del Sistema).
-- `ODOO_COMPANY_ID` es el ID numérico de la compañía en Odoo (se ve en la URL al entrar a Ajustes > Compañías > [la compañía]).
-- Si dejás estas 3 variables vacías, el scraper se comporta exactamente igual que antes: solo descarga el archivo, sin subirlo a ningún lado.
-- El resultado de la importación (facturas nuevas, ya existentes, con error) lo manda Odoo por mail, si se configuró `l10n_ar_import_arca_excel.notification_email` del lado de Odoo. Un fallo en la subida en sí (red, token incorrecto) queda registrado en el log del scraper y hace que el script termine con código de salida `2` (la descarga en sí sigue contando como exitosa).
+- El `company_id` de Odoo de cada empresa NO va acá, sino en `config/empresas.json` (ver sección siguiente) — se comparten `ODOO_UPLOAD_URL`/`ODOO_API_TOKEN` entre todas las empresas, y solo cambia el `company_id`.
+- Si dejás estas 2 variables vacías, el scraper se comporta exactamente igual que antes: solo descarga los archivos, sin subirlos a ningún lado.
+- El resultado de la importación (facturas nuevas, ya existentes, con error) lo manda Odoo por mail, si se configuró `l10n_ar_import_arca_excel.notification_email` del lado de Odoo. Un fallo en la subida en sí (red, token incorrecto) queda registrado en el log del scraper; si todas las descargas de ARCA salieron bien pero alguna subida a Odoo falló, el script termina con código de salida `2`.
+
+### 1.2 Configurar empresas representadas
+
+El scraper procesa, en una misma corrida, todas las empresas listadas en
+`config/empresas.json`. Cada entrada necesita el CUIT del representado, su
+nombre y el `company_id` de esa empresa en Odoo (se ve en la URL al entrar
+a Ajustes > Compañías > [la compañía] en Odoo; si no usás la integración
+con Odoo, poné igual algún valor numérico, no se usa):
+
+```json
+[
+  {
+    "cuit": "30-69076240-0",
+    "nombre": "AEROTEC ARGENTINA S.A.",
+    "odoo_company_id": 3
+  },
+  {
+    "cuit": "30-70742478-4",
+    "nombre": "AIR ANDES S.R.L.",
+    "odoo_company_id": 4
+  }
+]
+```
+
+Para agregar una empresa nueva, alcanza con sumar una entrada más al array
+— no hace falta tocar código. Este archivo va versionado en git (no tiene
+credenciales, solo CUIT/nombre/company_id).
 
 ### 2. Ajustar configuración (opcional)
 

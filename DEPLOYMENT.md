@@ -116,12 +116,19 @@ Contenido del archivo `.env`:
 ```env
 ARCA_CUIT=20123456789
 ARCA_PASSWORD=tu_password_real
-ARCA_REPRESENTADO_CUIT=20123456789
-ARCA_REPRESENTADO_NOMBRE=Nombre del Representado
 BROWSER_HEADLESS=true
 ```
 
 > `BROWSER_HEADLESS=true` es **obligatorio** en servidor sin entorno gráfico.
+
+Además, crear/editar `config/empresas.json` con la lista de empresas
+representadas a procesar en cada corrida (CUIT, nombre y `odoo_company_id`
+de cada una). Este archivo va versionado en git — no requiere protección
+como el `.env`, ya que no contiene credenciales:
+
+```bash
+sudo -u arca nano /opt/arca_scraper/config/empresas.json
+```
 
 Proteger el archivo de credenciales:
 

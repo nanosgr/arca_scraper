@@ -1,0 +1,17 @@
+[
+  {
+    "cuit": "30-69076240-0",
+    "nombre": "AEROTEC ARGENTINA S.A.",
+    "odoo_company_id": 3
+  },
+  {
+    "cuit": "30-70742478-4",
+    "nombre": "AIR ANDES S.R.L.",
+    "odoo_company_id": 4
+  },
+  {
+    "cuit": "33-71601033-9",
+    "nombre": "MENDOZA BALLOONS S.A.",
+    "odoo_company_id": 2
+  }
+]
