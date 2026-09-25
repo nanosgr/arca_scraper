@@ -16,6 +16,27 @@ class ARCAAuthenticator:
     def __init__(self, context: BrowserContext):
         self.context = context
         self.page = None
+        # Sufijo (CUIT sin guiones) para no pisar los screenshots/HTML de
+        # debug de otra empresa procesada en la misma corrida. Lo setea
+        # scraper.py antes de procesar cada representado.
+        self.log_suffix = ''
+
+    def _screenshot(self, name: str) -> "Path":
+        """Guarda un screenshot de debug con sufijo por empresa (si hay una activa)."""
+        from pathlib import Path as _Path
+        suffix = f"_{self.log_suffix}" if self.log_suffix else ""
+        path = config.LOGS_DIR / f"{name}{suffix}.png"
+        self.page.screenshot(path=str(path))
+        logger.info(f"Screenshot guardado en: {path}")
+        return path
+
+    def _dump_html(self, name: str) -> "Path":
+        """Guarda el HTML actual de la página, con el mismo sufijo por empresa que _screenshot."""
+        suffix = f"_{self.log_suffix}" if self.log_suffix else ""
+        path = config.LOGS_DIR / f"{name}{suffix}.html"
+        path.write_text(self.page.content(), encoding='utf-8')
+        logger.info(f"HTML guardado en: {path}")
+        return path
 
     def login(self) -> Page:
         """
@@ -333,17 +354,14 @@ class ARCAAuthenticator:
             self.page.wait_for_url("**/iva/#/init*", timeout=config.DOWNLOAD_TIMEOUT)
             time.sleep(1)
 
-            screenshot = config.LOGS_DIR / 'representado_activo.png'
-            self.page.screenshot(path=str(screenshot))
-            logger.info(f"Screenshot guardado en: {screenshot}")
+            self._screenshot('representado_activo')
             logger.info(f"URL sincronizada: {self.page.url}")
 
             return self.page
 
         except Exception as e:
             logger.error(f"Error al sincronizar Portal IVA: {str(e)}")
-            screenshot_path = config.LOGS_DIR / 'sync_error.png'
-            self.page.screenshot(path=str(screenshot_path))
+            self._screenshot('sync_error')
             raise
 
     def ingresar_nueva_declaracion(self) -> Page:
@@ -375,18 +393,14 @@ class ARCAAuthenticator:
             )
             logger.info("Períodos cargados.")
 
-            screenshot = config.LOGS_DIR / 'nueva_declaracion.png'
-            self.page.screenshot(path=str(screenshot))
-            logger.info(f"Screenshot guardado en: {screenshot}")
+            self._screenshot('nueva_declaracion')
             logger.info(f"URL actual: {self.page.url}")
 
             return self.page
 
         except Exception as e:
             logger.error(f"Error al ingresar a Nueva declaración jurada: {str(e)}")
-            screenshot_path = config.LOGS_DIR / 'nueva_declaracion_error.png'
-            self.page.screenshot(path=str(screenshot_path))
-            logger.error(f"Screenshot guardado en: {screenshot_path}")
+            self._screenshot('nueva_declaracion_error')
             raise
 
     def ingresar_periodo(self) -> Page:
@@ -420,18 +434,14 @@ class ARCAAuthenticator:
                 timeout=config.BROWSER_TIMEOUT
             )
 
-            screenshot = config.LOGS_DIR / 'panel_declaracion.png'
-            self.page.screenshot(path=str(screenshot))
-            logger.info(f"Screenshot guardado en: {screenshot}")
+            self._screenshot('panel_declaracion')
             logger.info(f"URL actual: {self.page.url}")
 
             return self.page
 
         except Exception as e:
             logger.error(f"Error al validar período: {str(e)}")
-            screenshot_path = config.LOGS_DIR / 'ingresar_periodo_error.png'
-            self.page.screenshot(path=str(screenshot_path))
-            logger.error(f"Screenshot guardado en: {screenshot_path}")
+            self._screenshot('ingresar_periodo_error')
             raise
 
     def ingresar_registro_declaracion(self) -> Page:
@@ -459,18 +469,14 @@ class ARCAAuthenticator:
             self.page.wait_for_url("**/liva/jsp/**", timeout=config.DOWNLOAD_TIMEOUT)
             self.page.wait_for_load_state("networkidle", timeout=config.BROWSER_TIMEOUT)
 
-            screenshot = config.LOGS_DIR / 'libro_compras.png'
-            self.page.screenshot(path=str(screenshot))
-            logger.info(f"Screenshot guardado en: {screenshot}")
+            self._screenshot('libro_compras')
             logger.info(f"URL actual: {self.page.url}")
 
             return self.page
 
         except Exception as e:
             logger.error(f"Error al ingresar a Registración y declaración: {str(e)}")
-            screenshot_path = config.LOGS_DIR / 'ingresar_registro_error.png'
-            self.page.screenshot(path=str(screenshot_path))
-            logger.error(f"Screenshot guardado en: {screenshot_path}")
+            self._screenshot('ingresar_registro_error')
             raise
 
     def navegar_libro_compras(self) -> Page:
@@ -488,6 +494,16 @@ class ARCAAuthenticator:
             raise Exception("Debe realizar login primero")
 
         try:
+            # ARCA a veces bloquea la generación de una nueva declaración si
+            # hay un borrador sin presentar de otro período (panel de error
+            # en mostrarMenu.do en vez del panel con 'Libro Compras'). Se
+            # detecta de entrada para fallar al instante con el motivo real,
+            # en vez de esperar 30s por un botón que nunca va a aparecer.
+            error_panel = self.page.locator('.panel-danger .panel-body').first
+            if error_panel.count() > 0 and error_panel.is_visible():
+                mensaje = error_panel.inner_text().strip()
+                raise Exception(f"ARCA bloqueó la generación de la declaración: {mensaje}")
+
             logger.info("Esperando panel 'Libro Compras'...")
             panel = self.page.locator('#btnLibroCompras').first
             panel.wait_for(state="visible", timeout=config.BROWSER_TIMEOUT)
@@ -497,18 +513,15 @@ class ARCAAuthenticator:
             self.page.wait_for_url("**/verCompras.do*", timeout=config.BROWSER_TIMEOUT)
             self.page.wait_for_load_state("networkidle", timeout=config.BROWSER_TIMEOUT)
 
-            screenshot = config.LOGS_DIR / 'ver_compras.png'
-            self.page.screenshot(path=str(screenshot))
-            logger.info(f"Screenshot guardado en: {screenshot}")
+            self._screenshot('ver_compras')
             logger.info(f"URL actual: {self.page.url}")
 
             return self.page
 
         except Exception as e:
-            logger.error(f"Error al navegar a Libro Compras: {str(e)}")
-            screenshot_path = config.LOGS_DIR / 'libro_compras_error.png'
-            self.page.screenshot(path=str(screenshot_path))
-            logger.error(f"Screenshot guardado en: {screenshot_path}")
+            logger.error(f"Error al navegar a Libro Compras: {str(e)} (URL actual: {self.page.url})")
+            self._screenshot('libro_compras_error')
+            self._dump_html('libro_compras_error')
             raise
 
     def importar_desde_arca(self) -> Page:
@@ -554,9 +567,7 @@ class ARCAAuthenticator:
             logger.info("Seleccionando modo 'Reemplazar'...")
             self.page.select_option('#modoImportacionAFIP', '2')
 
-            screenshot = config.LOGS_DIR / 'importar_modal.png'
-            self.page.screenshot(path=str(screenshot))
-            logger.info(f"Screenshot modal guardado en: {screenshot}")
+            self._screenshot('importar_modal')
 
             # PASO 4: Hacer clic en "Importar"
             logger.info("Iniciando importación...")
@@ -570,9 +581,7 @@ class ARCAAuthenticator:
             btn_actualizar.wait_for(state="visible", timeout=config.DOWNLOAD_TIMEOUT)
             logger.info("Importación finalizada, botón 'Actualizar' visible")
 
-            screenshot = config.LOGS_DIR / 'importar_progreso.png'
-            self.page.screenshot(path=str(screenshot))
-            logger.info(f"Screenshot progreso guardado en: {screenshot}")
+            self._screenshot('importar_progreso')
 
             # PASO 6: Hacer clic en "Actualizar"
             logger.info("Haciendo clic en 'Actualizar'...")
@@ -588,17 +597,13 @@ class ARCAAuthenticator:
             self.page.wait_for_selector('.modal-backdrop', state="hidden", timeout=config.BROWSER_TIMEOUT)
             logger.info("Modal cerrado")
 
-            screenshot = config.LOGS_DIR / 'importar_completado.png'
-            self.page.screenshot(path=str(screenshot))
-            logger.info(f"Screenshot final guardado en: {screenshot}")
+            self._screenshot('importar_completado')
 
             return self.page
 
         except Exception as e:
             logger.error(f"Error durante la importación desde ARCA: {str(e)}")
-            screenshot_path = config.LOGS_DIR / 'importar_error.png'
-            self.page.screenshot(path=str(screenshot_path))
-            logger.error(f"Screenshot guardado en: {screenshot_path}")
+            self._screenshot('importar_error')
             raise
 
     def descargar_csv_libro_compras(self, filepath) -> "Path":
@@ -653,9 +658,7 @@ class ARCAAuthenticator:
 
         except Exception as e:
             logger.error(f"Error al descargar CSV: {str(e)}")
-            screenshot_path = config.LOGS_DIR / 'csv_download_error.png'
-            self.page.screenshot(path=str(screenshot_path))
-            logger.error(f"Screenshot guardado en: {screenshot_path}")
+            self._screenshot('csv_download_error')
             raise
 
     def close(self) -> None:

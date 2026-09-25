@@ -49,6 +49,7 @@ def procesar_empresa(authenticator, iva_client, empresa, logger):
     nombre = empresa['nombre']
     cuit = empresa['cuit']
     resultado = {'empresa': nombre, 'cuit': cuit, 'estado': 'error', 'detalle': None}
+    authenticator.log_suffix = cuit.replace("-", "")
 
     try:
         logger.info(f"--- Procesando representado: {nombre} ({cuit}) ---")
