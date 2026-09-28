@@ -38,6 +38,19 @@ class ARCAAuthenticator:
         logger.info(f"HTML guardado en: {path}")
         return path
 
+    def _wait_network_idle_best_effort(self, timeout: int = 10000):
+        """
+        Espera 'load' y luego intenta 'networkidle' sin abortar si no llega.
+        El portal de ARCA hace requests periódicos después del login, por lo
+        que 'networkidle' a veces nunca se alcanza aunque la página esté lista.
+        """
+        from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+        self.page.wait_for_load_state("load", timeout=config.BROWSER_TIMEOUT)
+        try:
+            self.page.wait_for_load_state("networkidle", timeout=timeout)
+        except PlaywrightTimeoutError:
+            logger.info(f"'networkidle' no alcanzado en {timeout}ms; se continúa (URL: {self.page.url})")
+
     def login(self) -> Page:
         """
         Realiza el login en ARCA usando las credenciales configuradas.
@@ -214,7 +227,7 @@ class ARCAAuthenticator:
 
             # Esperar a que complete la autenticación
             logger.info("Esperando respuesta de autenticación...")
-            self.page.wait_for_load_state("networkidle", timeout=config.BROWSER_TIMEOUT)
+            self._wait_network_idle_best_effort()
 
             # Esperar un poco más para asegurar que la página cargó
             time.sleep(2)
@@ -268,7 +281,7 @@ class ARCAAuthenticator:
             ver_todos = self.page.locator('a[href="/portal/app/mis-servicios"]').first
             ver_todos.wait_for(state="visible", timeout=config.BROWSER_TIMEOUT)
             ver_todos.click()
-            self.page.wait_for_load_state("networkidle")
+            self._wait_network_idle_best_effort()
             time.sleep(2)
 
             screenshot = config.LOGS_DIR / 'mis_servicios.png'
