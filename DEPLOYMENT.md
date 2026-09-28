@@ -315,6 +315,9 @@ sudo -u arca bash -c "cd /opt/arca_scraper && git pull"
 sudo systemctl restart arca-scraper.timer
 ```
 
+> Si el servidor no tiene acceso a GitHub, desplegá con `./scripts/deploy_bundle.sh`
+> desde la máquina de desarrollo. Ver [DEPLOY_BUNDLE.md](DEPLOY_BUNDLE.md).
+
 ### Cambiar la frecuencia del timer
 
 ```bash
