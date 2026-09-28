@@ -58,7 +58,7 @@ Desde la **máquina de desarrollo**, en la raíz del repo, con los cambios ya
 commiteados en `master`:
 
 ```bash
-./scripts/deploy_bundle.sh                     # usa sebastianr@kal-el
+./scripts/deploy_bundle.sh                     # usa sebastianr@172.16.140.98
 ./scripts/deploy_bundle.sh usuario@servidor    # otro destino
 ARCA_SERVER=usuario@servidor ./scripts/deploy_bundle.sh
 ```
@@ -93,7 +93,7 @@ Si preferís hacerlo a mano o el script falla en algún paso.
 ```bash
 git status                                  # sin cambios pendientes
 git bundle create /tmp/arca_scraper.bundle master
-scp /tmp/arca_scraper.bundle sebastianr@kal-el:/tmp/
+scp /tmp/arca_scraper.bundle sebastianr@172.16.140.98:/tmp/
 ```
 
 ### En el servidor (vía ssh)
